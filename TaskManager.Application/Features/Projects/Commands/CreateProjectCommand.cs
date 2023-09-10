@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FluentValidation;
 using MediatR;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,15 @@ using TaskManager.Domain.Entities;
 
 namespace TaskManager.Application.Features.Projects.Commands
 {
+    public class CreateProjectCommandValidator : AbstractValidator<CreateProjectCommand>
+    {
+        public CreateProjectCommandValidator()
+        {
+            RuleFor(x => x.Name).NotEmpty();
+            RuleFor(x => x.Description).NotEmpty();
+        }
+    }
+
     public class CreateProjectCommand : IRequest<Response<ProjectResponse>>
     {
         public string Name { get; set; }

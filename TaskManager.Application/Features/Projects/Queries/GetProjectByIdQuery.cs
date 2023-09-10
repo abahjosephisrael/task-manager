@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using FluentValidation;
+using MediatR;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,13 @@ using TaskManager.Domain.Entities;
 
 namespace TaskManager.Application.Features.Projects.Queries
 {
+    public class GetProjectByIdQueryValidator: AbstractValidator<GetProjectByIdQuery>
+    {
+        public GetProjectByIdQueryValidator()
+        {
+            RuleFor(x => x.Id).NotEmpty();
+        }
+    }
     public class GetProjectByIdQuery : IRequest<Response<ProjectResponse>>
     {
         public Guid Id { get; set; }
@@ -29,7 +37,7 @@ namespace TaskManager.Application.Features.Projects.Queries
         public async Task<Response<ProjectResponse>> Handle(GetProjectByIdQuery request, CancellationToken cancellationToken)
         {
             var project = await projectRepo.GetByAsync(x=>x.Id==request.Id, x=>x.Tasks);
-            if (project == null) throw new KeyNotFoundException($"Project with ID:{request.Id} not found");
+            if (project == null || project.Deleted) throw new KeyNotFoundException($"Project with ID:{request.Id} not found");
             var projectResponse = new ProjectResponse
             {
                 Description = project.Description,

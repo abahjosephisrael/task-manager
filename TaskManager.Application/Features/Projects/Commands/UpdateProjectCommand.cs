@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FluentValidation;
 using MediatR;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,15 @@ using TaskManager.Domain.Entities;
 
 namespace TaskManager.Application.Features.Projects.Commands
 {
+    public class UpdateProjectCommandValidator : AbstractValidator<UpdateProjectCommand>
+    {
+        public UpdateProjectCommandValidator()
+        {
+            RuleFor(x => x.Id).NotEmpty();
+            RuleFor(x => x.Name).NotEmpty();
+            RuleFor(x => x.Description).NotEmpty();
+        }
+    }
     public class UpdateProjectCommand : IRequest<Response<ProjectResponse>>
     {
         public Guid Id { get; set; }
@@ -34,7 +44,7 @@ namespace TaskManager.Application.Features.Projects.Commands
         public async Task<Response<ProjectResponse>> Handle(UpdateProjectCommand request, CancellationToken cancellationToken)
         {
             var project = await projectRepo.GetByIdAsync(request.Id);
-            if (project == null) throw new KeyNotFoundException($"Project with ID:{request.Id} not found");
+            if (project == null || project.Deleted) throw new KeyNotFoundException($"Project with ID:{request.Id} not found");
             project.Name = request.Name??project.Name;
             project.Description = request.Description ?? project.Description;
             await projectRepo.UpdateAsync(project);

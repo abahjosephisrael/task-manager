@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System;
 using TaskManager.Application.Interfaces;
 using TaskManager.Domain.Commons;
@@ -86,6 +87,27 @@ namespace TaskManager.Infrastructure.Persistence.Contexts
                 entity.HasNoKey();
                 entity.ToTable("UserTasks");
             });
+
+            var dateTimeConverter = new ValueConverter<DateTime, DateTime>(
+                v => v.ToUniversalTime(),
+                v => DateTime.SpecifyKind(v, DateTimeKind.Utc)
+                );
+
+            var nullableDateTimeConverter = new ValueConverter<DateTime?, DateTime?>(
+                v => v.HasValue ? v.Value.ToUniversalTime() : v,
+                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v
+                );
+
+            foreach (var property in builder.Model.GetEntityTypes()
+            .SelectMany(t => t.GetProperties())
+            .Where(p => p.ClrType == typeof(DateTime) || p.ClrType == typeof(DateTime?)))
+            {
+                if (property.GetType() == typeof(DateTime)) 
+                    property.SetValueConverter(dateTimeConverter);
+                if (property.GetType() == typeof(DateTime?)) 
+                    property.SetValueConverter(nullableDateTimeConverter);
+            }
+            base.OnModelCreating(builder);
         }
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())

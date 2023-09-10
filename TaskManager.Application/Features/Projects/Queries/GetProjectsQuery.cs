@@ -31,7 +31,7 @@ namespace TaskManager.Application.Features.Projects.Queries
         {
             var projects = await projectRepo.GetAllAsync();
             int total = projects.Count;
-            var response = projects.Select(x => new ProjectResponse
+            var response = projects.Where(x=>!x.Deleted).Select(x => new ProjectResponse
             {
                 Description = x.Description,
                 Id = x.Id,

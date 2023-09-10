@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FluentValidation;
 using MediatR;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,13 @@ using TaskManager.Domain.Entities;
 
 namespace TaskManager.Application.Features.Projects.Commands
 {
+    public class DeleteProjectCommandValidator: AbstractValidator<DeleteProjectCommand>
+    {
+        public DeleteProjectCommandValidator()
+        {
+            RuleFor(x => x.Id).NotEmpty();
+        }
+    }
     public class DeleteProjectCommand : IRequest<Response<Guid>>
     {
         public Guid Id { get; set; }
@@ -19,20 +27,17 @@ namespace TaskManager.Application.Features.Projects.Commands
     public class DeleteProjectCommandHandler : IRequestHandler<DeleteProjectCommand, Response<Guid>>
     {
         private readonly IRepositoryAsync<Project> projectRepo;
-        private readonly IMapper mapper;
 
         public DeleteProjectCommandHandler(
-            IRepositoryAsync<Project> projectRepo,
-            IMapper mapper
+            IRepositoryAsync<Project> projectRepo
             )
         {
             this.projectRepo = projectRepo;
-            this.mapper = mapper;
         }
         public async Task<Response<Guid>> Handle(DeleteProjectCommand request, CancellationToken cancellationToken)
         {
             var project = await projectRepo.GetByIdAsync(request.Id);
-            if (project == null) throw new KeyNotFoundException($"Project with ID:{request.Id} not found");
+            if (project == null || project.Deleted) throw new KeyNotFoundException($"Project with ID:{request.Id} not found");
             project.Deleted = true;
             await projectRepo.UpdateAsync(project);
             return new Response<Guid>(project.Id,"Project deleted successfully");

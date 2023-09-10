@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using TaskManager.Application.DTOs;
 using TaskManager.Application.Features.Projects.Commands;
+using TaskManager.Application.Features.Tasks.Commands;
 using TaskManager.Application.Features.Users.Commands;
 using TaskManager.Domain.Entities;
 
@@ -18,6 +19,8 @@ namespace TaskManager.Application.Mappings
             CreateMap<CreateUserCommand, CreateUser>().ReverseMap();
             CreateMap<UpdateUserCommand, UpdateUser>().ReverseMap();
             CreateMap<LoginCommand, Login>().ReverseMap();
+            CreateMap<CreateTaskCommand, Domain.Entities.Task>().ReverseMap();
+            CreateMap<TaskResponse, Domain.Entities.Task>().ReverseMap();
             //CreateMap<,>().ReverseMap();
         }
     }
