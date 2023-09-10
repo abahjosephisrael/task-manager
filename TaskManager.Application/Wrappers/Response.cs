@@ -25,7 +25,7 @@ namespace TaskManager.Application.Wrappers
         public bool Succeeded { get; set; }
         [JsonPropertyName("message")]
         public string Message { get; set; }
-        [JsonPropertyName("error")]
+        [JsonPropertyName("errors")]
         public List<string> Errors { get; set; }
         [JsonPropertyName("data")]
         public T Data { get; set; }

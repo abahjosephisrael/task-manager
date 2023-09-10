@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using TaskManager.Application.Behaviours;
+using TaskManager.Application.Mappings;
 
 namespace TaskManager.Application
 {

@@ -6,13 +6,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
-using System;
 using System.Text;
-using Ameta.SSO.Services.Api.Application.Interfaces;
-using Ameta.SSO.Services.Api.Application.Wrappers;
-using Ameta.SSO.Services.Api.Domain.Settings;
-using Ameta.SSO.Services.Api.Infrastructure.Identity.Contexts;
-using Ameta.SSO.Services.Api.Infrastructure.Identity.Models;
+using TaskManager.Application.Interfaces;
+using TaskManager.Application.Wrappers;
+using TaskManager.Domain.Entities;
+using TaskManager.Domain.Settings;
+using TaskManager.Infrastructure.Persistence.Contexts;
 using TaskManager.Infrastructure.Persistence.Repository;
 using TaskManager.Infrastructure.Persistence.Services;
 
@@ -20,29 +19,27 @@ namespace TaskManager.Infrastructure.Persistence
 {
     public static class ServiceExtensions
     {
-        public static void AddIdentityInfrastructure(this IServiceCollection services, IConfiguration configuration)
+        public static void AddPersistenceInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddDbContext<IdentityContext>(options =>
+            services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
-                b => b.MigrationsAssembly(typeof(IdentityContext).Assembly.FullName)));
+                b => b.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
-            services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+            services.AddIdentity<User, IdentityRole>(options =>
             {
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-            }).AddEntityFrameworkStores<IdentityContext>().AddDefaultTokenProviders();
+            }).AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
 
             #region Services
-            services.AddTransient<IAccountServices, AccountServices>();
-            services.AddTransient<IClientApplicationService, ClientApplicationService>();
+            services.AddTransient<IUserServices, UserServices>();
             #endregion
 
             #region Repositories
-            services.AddTransient(typeof(IGenericRepositoryAsync<>), typeof(RepositoryAsync<>));
+            services.AddTransient(typeof(IRepositoryAsync<>), typeof(RepositoryAsync<>));
             #endregion
             services.Configure<JWTSettings>(configuration.GetSection("JWTSettings"));
-            services.Configure<CoreBanking>(configuration.GetSection("CoreBanking"));
             services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

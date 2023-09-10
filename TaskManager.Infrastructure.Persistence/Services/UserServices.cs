@@ -12,6 +12,7 @@ using TaskManager.Application.Interfaces;
 using TaskManager.Domain.Settings;
 using TaskManager.Application.Exceptions;
 using TaskManager.Application.DTOs;
+using TaskManager.Application.Features.Users.Commands;
 
 namespace TaskManager.Infrastructure.Persistence.Services
 {
@@ -41,7 +42,7 @@ namespace TaskManager.Infrastructure.Persistence.Services
             this.authenticatedUserService = authenticatedUserService;
         }
 
-        public async Task<string> CreateUser(CreateUser request)
+        public async Task<LoginResponse> CreateUser(CreateUserCommand request)
         {
             var userWithSameEmail = await _userManager.FindByEmailAsync(request.Email);
             if (userWithSameEmail == null)
@@ -51,17 +52,19 @@ namespace TaskManager.Infrastructure.Persistence.Services
                     Email = request.Email,
                     FirstName = request.FirstName,
                     LastName = request.LastName,
-                    UserName = request.Email
+                    UserName = request.Email,
+                    EmailConfirmed = true
                 };
                 var result = await _userManager.CreateAsync(user, request.Password.Trim());
                 if (result.Succeeded)
                 {
                     await _userManager.AddToRoleAsync(user, "User");
-                    return user.Id;
+                    var loginRes = await GenerateLoginResponse(user,request.IpAddress);
+                    return loginRes;
                 }
                 else
                 {
-                    throw new ApiException($"{result.Errors.FirstOrDefault().Description}");
+                    throw new ApiException($"{result?.Errors?.FirstOrDefault().Description}");
                 }
             }
             else
@@ -91,7 +94,7 @@ namespace TaskManager.Infrastructure.Persistence.Services
             throw new ApiException($"Invalid.UserId");
         }
 
-        private string RandomTokenString()
+        private static string RandomTokenString()
         {
             using var rngCryptoServiceProvider = new RNGCryptoServiceProvider();
             var randomBytes = new byte[40];
@@ -149,72 +152,48 @@ namespace TaskManager.Infrastructure.Persistence.Services
 
         public async Task<string> UpdateUser(UpdateUser request)
         {
-            var account = await _userManager.FindByIdAsync(authenticatedUserService.UserId);
-            if (account == null) throw new ApiException("Invalid account");
-            account.FirstName = request.FirstName ?? account.FirstName;
-            account.LastName = request.LastName ?? account.LastName;
-            var result = await _userManager.UpdateAsync(account);
+            var user = await _userManager.FindByIdAsync(authenticatedUserService.UserId);
+            if (user == null) throw new ApiException("Invalid user");
+            user.FirstName = request.FirstName ?? user.FirstName;
+            user.LastName = request.LastName ?? user.LastName;
+            var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded) throw new ApiException(result.Errors.First().Description);
-            return account.Id;
+            return user.Id;
+        }
+        
+        public async Task<string> DeleteUser(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null) throw new ApiException("Invalid user");
+            var userRoles = await _userManager.GetRolesAsync(user);
+            await _userManager.RemoveFromRolesAsync(user, userRoles);
+
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded) throw new ApiException(result.Errors.First().Description);
+            return user.Id;
         }
 
-        public async Task<RefreshTokenDto.Response> RefreshToken(RefreshTokenDto.Request request)
+        public async Task<UserResponse> GetUser(string userId)
         {
-
-            var refreshToken = _refreshTokenRepo.GetAllQuery().FirstOrDefault(r => r.Token == request.Token);
-            if (refreshToken == null) throw new ApiException("Invalid token");
-            var user = await _userManager.FindByIdAsync(refreshToken.UserId);
-            if (user == null) throw new ApiException("Invalid token");
-
-            if (!refreshToken.IsActive) throw new UnauthorizedAccessException("Token expired");
-
-
-            JwtSecurityToken jwtSecurityToken = await GenerateJWToken(user);
-            RefreshTokenDto.Response response = new RefreshTokenDto.Response();
-            response.JwToken = new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
-            response.Email = user.Email;
-            var rolesList = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
-            response.Roles = rolesList.ToList();
-            response.IsVerified = user.EmailConfirmed;
-
-            var newRefreshToken = GenerateRefreshToken(request.IpAddress);
-            newRefreshToken.UserId = user.Id;
-            await _refreshTokenRepo.AddAsync(newRefreshToken);
-
-            refreshToken.ReplacedByToken = newRefreshToken.Token;
-            refreshToken.RevokedByIp = request.IpAddress;
-            refreshToken.Revoked = DateTime.UtcNow;
-            await _refreshTokenRepo.UpdateAsync(refreshToken);
-
-            response.RefreshToken = newRefreshToken.Token;
-            response.FirstName = user.FirstName;
-            response.LastName = user.LastName;
-            response.PhoneNumber = user.PhoneNumber;
-            response.IsPhoneNumberVerified = user.PhoneNumberConfirmed;
-            return response;
-        }
-
-        public async Task<UserResponse> GetUser(string accountId)
-        {
-            var account = await _userManager.FindByIdAsync(accountId);
-            if (account == null) throw new KeyNotFoundException("Not.Found");
-            var role = await _userManager.GetRolesAsync(account);
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null) throw new KeyNotFoundException("User Not Found");
+            var role = await _userManager.GetRolesAsync(user);
             return new UserResponse
             {
-                Email = account.Email,
-                FirstName = account.FirstName,
-                Id = account.Id,
-                LastName = account.LastName,
-                LastLogin = account.LastLogin,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                Id = user.Id,
+                LastName = user.LastName,
+                LastLogin = user.LastLogin,
                 Role = role.First()
             };
         }
 
-        public (int total, List<UserResponse> data) GetUsers(int pageNumber, int pageSize)
+        public async Task<(int total, List<UserResponse> data)> GetUsers(int pageNumber, int pageSize)
         {
-            var accounts = _userManager.Users.ToList();
-            int total = accounts.Count;
-            var accountsResponse = accounts
+            var users = await _userManager.Users.ToListAsync();
+            int total = users.Count;
+            var usersResponse = users
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .Select(a => new UserResponse
@@ -226,47 +205,57 @@ namespace TaskManager.Infrastructure.Persistence.Services
                     LastLogin = a.LastLogin
                 })
                 .ToList();
-            return (total, accountsResponse);
+            return (total, usersResponse);
         }
 
-        protected async Task<Login.Response> GenerateLoginResponse(User user, string ipAddress, bool? isKey = false)
+
+        public async Task<LoginResponse> Login(LoginCommand request)
+        {
+            var user = await _userManager.FindByEmailAsync(request.Email.Trim());
+            if (user == null)
+            {
+                throw new ApiException("There is no user with this user. If you are new, please Sign up");
+            }
+            if (!user.EmailConfirmed)
+            {
+                throw new ApiException("Account Not Confirmed");
+            }
+
+            var result = await _signInManager.PasswordSignInAsync(user.UserName, request.Password.Trim(), false, lockoutOnFailure: true);
+
+            if (result.Succeeded)
+            {
+                return await GenerateLoginResponse(user, request.IpAddress);
+            }
+            if (result.IsLockedOut)
+            {
+                throw new ApiException("Your user is locked due to many login trials. Try again after sometimes or reset your password.");
+            }
+            throw new ApiException("Incorrect email or password.\nYour user will be locked after 5 failed attempts.");
+        }
+
+
+        protected async Task<LoginResponse> GenerateLoginResponse(User user, string ipAddress)
         {
 
             JwtSecurityToken jwtSecurityToken = await GenerateJWToken(user);
-            var response = new Login.Response();
-            response.Id = user.Id.ToString();
-            response.JwToken = new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
-            response.Email = user.Email;
+            LoginResponse response = new()
+            {
+                Id = user.Id.ToString(),
+                Token = new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken),
+                Email = user.Email
+            };
             var rolesList = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
             response.Roles = rolesList.ToList();
 
             var refreshToken = GenerateRefreshToken(ipAddress);
-            refreshToken.ApplicationUserId = user.Id;
+            refreshToken.UserId = user.Id;
             await _refreshTokenRepo.AddAsync(refreshToken);
 
-            response.RefreshToken = refreshToken.Token;
             response.FullName = user.FirstName + " " + user.LastName;
-            response.LastName = user.LastName;
-            response.FirstName = user.FirstName;
-            response.HasPasscode = user.HasPasscode;
-            response.PhoneNumber = user.PhoneNumber;
-            response.PhoneCode = user.PhoneCode;
-            response.IsPhoneNumberVerified = user.PhoneNumberConfirmed;
-            response.IsOwner = user.IsOwner;
-            response.TenantId = user.TenantId;
-            response.IsProfileUpdated = user.IsProfileUpdated;
-
-            var tenant = await tenantRepo.GetByAsync(x => x.Id == user.TenantId);
-
-            response.LastLogin = user.LastLogin;
-            response.TenantIdentifier = tenant?.Identifier;
-            response.DOB = user.DOB;
-            response.Environment = user.Environment;
-            if (isKey.HasValue && !isKey.Value)
-            {
-                user.LastLogin = DateTime.UtcNow;
-                await _userManager.UpdateAsync(user);
-            }
+            user.LastLogin = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+            response.LastLogin = user.LastLogin.ToString();
             return response;
         }
 

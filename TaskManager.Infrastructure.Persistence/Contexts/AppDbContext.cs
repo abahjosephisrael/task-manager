@@ -1,15 +1,27 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using System;
+using TaskManager.Application.Interfaces;
+using TaskManager.Domain.Commons;
 using TaskManager.Domain.Entities;
 
 namespace TaskManager.Infrastructure.Persistence.Contexts
 {
     public class AppDbContext : IdentityDbContext<User>
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+        private readonly IDateTimeService dateTime;
+        private readonly IAuthenticatedUserService authenticatedUserService;
+
+        public AppDbContext(
+            DbContextOptions<AppDbContext> options,
+            IDateTimeService dateTime,
+            IAuthenticatedUserService authenticatedUserService
+            ) : base(options)
         {
             Database.Migrate();
+            this.dateTime = dateTime;
+            this.authenticatedUserService = authenticatedUserService;
         }
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -21,7 +33,7 @@ namespace TaskManager.Infrastructure.Persistence.Contexts
 
             builder.Entity<IdentityRole>(entity =>
             {
-                entity.ToTable(name: "UserRoles");
+                entity.ToTable(name: "Roles");
             });
 
             builder.Entity<RefreshToken>(entity =>
@@ -74,6 +86,25 @@ namespace TaskManager.Infrastructure.Persistence.Contexts
                 entity.HasNoKey();
                 entity.ToTable("UserTasks");
             });
+        }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())
+        {
+            foreach (var entry in ChangeTracker.Entries<AuditableBaseEntity>())
+            {
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                        entry.Entity.Created = dateTime.CurrentUtc;
+                        entry.Entity.CreatedBy = authenticatedUserService.UserId;
+                        break;
+                    case EntityState.Modified:
+                        entry.Entity.LastModified = dateTime.CurrentUtc;
+                        entry.Entity.LastModifiedBy = authenticatedUserService.UserId;
+                        break;
+                }
+            }
+            return base.SaveChangesAsync(cancellationToken);
         }
     }
 }
