@@ -21,6 +21,7 @@ namespace TaskManager.Application.Mappings
             CreateMap<LoginCommand, Login>().ReverseMap();
             CreateMap<CreateTaskCommand, Domain.Entities.Task>().ReverseMap();
             CreateMap<TaskResponse, Domain.Entities.Task>().ReverseMap();
+            CreateMap<CreateNotification, Notification>().ReverseMap();
             //CreateMap<,>().ReverseMap();
         }
     }

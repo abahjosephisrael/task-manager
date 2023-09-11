@@ -40,18 +40,24 @@ namespace TaskManager.Application.Features.Tasks.Commands
     public class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, Response<TaskResponse>>
     {
         private readonly IRepositoryAsync<Domain.Entities.Task> taskRepo;
+        private readonly IRepositoryAsync<Project> projectRepo;
         private readonly IMapper mapper;
 
         public CreateTaskCommandHandler(
             IRepositoryAsync<Domain.Entities.Task> taskRepo,
+            IRepositoryAsync<Project> projectRepo,
             IMapper mapper
             )
         {
             this.taskRepo = taskRepo;
+            this.projectRepo = projectRepo;
             this.mapper = mapper;
         }
         public async Task<Response<TaskResponse>> Handle(CreateTaskCommand request, CancellationToken cancellationToken)
         {
+
+            var project = await projectRepo.GetByIdAsync(request.ProjectId);
+            if (project == null || project.Deleted) throw new KeyNotFoundException($"Project with ID:{request.ProjectId} not found");
             var task = mapper.Map<Domain.Entities.Task>(request);
             await taskRepo.AddAsync(task);
             var res = new TaskResponse

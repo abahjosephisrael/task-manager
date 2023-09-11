@@ -13,5 +13,6 @@ namespace TaskManager.Domain.Entities
         public string Message { get; set; }
         public NotificationType Type { get; set; }
         public Guid UserId { get; set; }
+        public bool Read { get; set; }
     }
 }

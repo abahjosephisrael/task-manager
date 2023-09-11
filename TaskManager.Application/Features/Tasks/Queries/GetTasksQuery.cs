@@ -21,6 +21,7 @@ namespace TaskManager.Application.Features.Tasks.Queries
         public Priority? Priority { get; set; }
         public string? SearchText { get; set; }
         public bool? Descending { get; set; }
+        public bool? DueForTheWeek { get; set; }
         public Guid? ProjectId { get; set; }
     }
     public class GetTasksQueryHandler : IRequestHandler<GetTasksQuery, PagedResponse<List<TaskResponse>>>
@@ -36,28 +37,44 @@ namespace TaskManager.Application.Features.Tasks.Queries
         }
         public async Task<PagedResponse<List<TaskResponse>>> Handle(GetTasksQuery request, CancellationToken cancellationToken)
         {
-            var specification = new TaskSpecification(
-                projectId: request.ProjectId,
-                status: request.Status,
-                priority: request.Priority,
-                searchText: request.SearchText,
-                skip: request.PageNumber,
-                take: request.PageSize,
-                descending: request.Descending
-                );
+            IReadOnlyList<Domain.Entities.Task> tasks;
+            int total = 0;
+            if (request.DueForTheWeek.HasValue && request.DueForTheWeek.Value)
+            {
+                var today = DateTime.UtcNow;
+                tasks = await taskRepo.ListAsync(x => !x.Deleted);
+                total = tasks.Count(x => DatesAreInTheSameWeek(today, x.DueDate));
+                tasks = tasks
+                    .Where(x=> DatesAreInTheSameWeek(today, x.DueDate))
+                    .Skip((request.PageNumber - 1)*request.PageSize)
+                    .Take(request.PageSize)
+                    .ToList();
+            }
+            else
+            {
 
-            var countSpecification = new TaskSpecification(
-                projectId: request.ProjectId,
-                status: request.Status,
-                priority: request.Priority,
-                searchText: request.SearchText,
-                skip: null,
-                take: null,
-                descending: request.Descending
-                );
-            var tasks = await taskRepo.ListAsync(specification);
-            var total = await taskRepo.CountAsync(countSpecification);
+                var specification = new TaskSpecification(
+                    projectId: request.ProjectId,
+                    status: request.Status,
+                    priority: request.Priority,
+                    searchText: request.SearchText,
+                    skip: request.PageNumber,
+                    take: request.PageSize,
+                    descending: request.Descending
+                    );
 
+                var countSpecification = new TaskSpecification(
+                    projectId: request.ProjectId,
+                    status: request.Status,
+                    priority: request.Priority,
+                    searchText: request.SearchText,
+                    skip: null,
+                    take: null,
+                    descending: request.Descending
+                    );
+                tasks = await taskRepo.ListAsync(specification);
+                total = await taskRepo.CountAsync(countSpecification);
+            }
             var res = tasks.Select(x=> new TaskResponse
             {
                 Id = x.Id,
@@ -68,6 +85,15 @@ namespace TaskManager.Application.Features.Tasks.Queries
                 Title = x.Title,
             }).ToList();
             return new PagedResponse<List<TaskResponse>>(res, request.PageNumber, request.PageSize, total) { Message = $"{total} record(s) found" };
+        }
+
+        private static bool DatesAreInTheSameWeek(DateTime date1, DateTime date2)
+        {
+            var calendar = System.Globalization.DateTimeFormatInfo.CurrentInfo.Calendar;
+            var d1 = date1.Date.AddDays(-1 * (int)calendar.GetDayOfWeek(date1));
+            var d2 = date2.Date.AddDays(-1 * (int)calendar.GetDayOfWeek(date2));
+
+            return d1 == d2;
         }
     }
 }

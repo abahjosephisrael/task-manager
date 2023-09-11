@@ -34,6 +34,7 @@ namespace TaskManager.Infrastructure.Persistence
 
             #region Services
             services.AddTransient<IUserServices, UserServices>();
+            services.AddTransient<INotificationService, NotificationService>();
             #endregion
 
             #region Repositories

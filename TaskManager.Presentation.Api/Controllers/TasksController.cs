@@ -24,6 +24,16 @@ namespace TaskManager.Presentation.Api.Controllers
         {
             return Ok(await Mediator.Send(command));
         }
+        
+        [HttpPut("{taskId}/mark-completed")]
+        public async Task<IActionResult> MarkAsCompleted([FromRoute] Guid taskId)
+        {
+            return Ok(await Mediator.Send(new UpdateTaskCommand
+            {
+                Id = taskId,
+                Status = Domain.Enums.Status.Completed
+            }));
+        }
 
         [HttpDelete("{Id}")]
         public async Task<IActionResult> DeleteTask([FromRoute] DeleteTaskCommand command)
