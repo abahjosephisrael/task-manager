@@ -18,6 +18,18 @@ namespace TaskManager.Presentation.Api.Controllers
         {
             return Ok(await Mediator.Send(command));
         }
+        
+        [HttpPost("assign-to-project")]
+        public async Task<IActionResult> AssignTaskToProject([FromBody] AssignTaskCommand command)
+        {
+            return Ok(await Mediator.Send(command));
+        }
+        
+        [HttpPost("assign-to-user")]
+        public async Task<IActionResult> AssignTaskToUser([FromBody] AssignTaskToUserCommand command)
+        {
+            return Ok(await Mediator.Send(command));
+        }
 
         [HttpPut]
         public async Task<IActionResult> UpdateTask([FromBody] UpdateTaskCommand command)

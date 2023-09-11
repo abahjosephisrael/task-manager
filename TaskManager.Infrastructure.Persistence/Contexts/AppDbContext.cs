@@ -84,7 +84,7 @@ namespace TaskManager.Infrastructure.Persistence.Contexts
 
             builder.Entity<UserTask>(entity =>
             {
-                entity.HasNoKey();
+                entity.HasKey("TaskId");
                 entity.ToTable("UserTasks");
             });
 

@@ -9,6 +9,7 @@ namespace TaskManager.Domain.Enums
     public enum NotificationType
     {
         Reminder = 1,
-        Update
+        Update,
+        Assignment
     }
 }
