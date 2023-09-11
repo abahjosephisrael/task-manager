@@ -105,7 +105,7 @@ namespace TaskManager.Infrastructure.Persistence.Services
             if (notification == null || notification.Deleted)
                 throw new KeyNotFoundException($"Notification with ID:{id} not found");
 
-            notification.Read = true;
+            notification.Read = !notification.Read;
             await notificationRepo.UpdateAsync(notification);
             return notification;
         }

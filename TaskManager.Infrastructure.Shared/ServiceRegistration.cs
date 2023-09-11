@@ -10,6 +10,7 @@ namespace TaskManager.Infrastructure.Shared
         public static void AddSharedInfrastructure(this IServiceCollection services, IConfiguration _config)
         {
             services.AddTransient<IDateTimeService, DateTimeService>();
+            services.AddTransient<IBackgroundTask, BackgroundTask>();
         }
     }
 }

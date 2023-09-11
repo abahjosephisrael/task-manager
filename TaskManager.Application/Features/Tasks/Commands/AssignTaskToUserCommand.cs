@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using FluentValidation;
+using Hangfire;
 using MediatR;
 using System;
 using System.Collections.Generic;
@@ -60,12 +61,17 @@ namespace TaskManager.Application.Features.Tasks.Commands
             if (userTaskRepo.GetAllQuery().Any(x => x.UserId == request.UserId.ToString() && x.TaskId == request.TaskId))
                 throw new ApiException("Task Already Assigned To User");
             await userTaskRepo.AddAsync(new UserTask { Task = task, User = user, UserId = user.Id, TaskId = task.Id });
-            await notificationService.Create(new CreateNotification
-            {
-                Message = $"Task Assignment: {task.Title} has been assigned to you. Due date is {task.DueDate.ToShortDateString()}",
-                Type = NotificationType.Assignment,
-                UserId = request.UserId,
-            });
+
+            BackgroundJob.Enqueue(
+                    () =>
+                    notificationService.Create(new CreateNotification
+                    {
+                        Message = $"Task Assignment: {task.Title} has been assigned to you. Due date is {task.DueDate.ToShortDateString()}",
+                        Type = NotificationType.Assignment,
+                        UserId = request.UserId
+                    })
+                    );
+
             return new Response<Guid>(task.Id, $"Task {task.Title} Assigned {user.FirstName} {user.LastName} successfully");
         }
     }

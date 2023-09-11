@@ -1,5 +1,10 @@
 using FluentValidation.AspNetCore;
+using Hangfire;
+using Hangfire.Common;
+using Hangfire.Dashboard;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Newtonsoft.Json;
 using TaskManager.Application;
 using TaskManager.Application.Interfaces;
@@ -29,6 +34,20 @@ builder.Services.AddFluentValidationAutoValidation().AddFluentValidationClientsi
 builder.Services.AddControllersWithViews().AddNewtonsoftJson(options => options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore);
 builder.Services.AddHealthChecks();
 builder.Services.AddScoped<IAuthenticatedUserService, AuthenticatedUserService>();
+
+
+builder.Services.AddHangfire(x => x.UsePostgreSqlStorage(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddHangfireServer();
+
+var backg = builder.Services.BuildServiceProvider().GetRequiredService<IBackgroundTask>();
+
+var recurringJobManager = builder.Services.BuildServiceProvider().GetRequiredService<IRecurringJobManager>();
+
+recurringJobManager.AddOrUpdate(
+    "Send Due Notification", 
+    () => backg.SendDueNotification(), 
+    Cron.HourInterval(5));
+
 
 var app = builder.Build();
 
@@ -63,5 +82,11 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+
+app.UseHangfireDashboard("/background", new DashboardOptions
+{
+    IsReadOnlyFunc = (DashboardContext context) => false
+});
 
 app.Run();
