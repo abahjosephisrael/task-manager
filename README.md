@@ -20,6 +20,7 @@ To run this application:
 - http://localhost:2023/swagger/index.html -> Loads up the swagger documentation
 - Login using the default user account, email: admin@test.email, password: Admin.1@
 - http://localhost:2023/background -> Loads up background service dashboard
+![image](https://github.com/abahjosephisrael/task-manager/assets/42052027/81f229be-a4eb-432e-96cc-581c03df1975)
 
 Note: Migration is automatic.
 
